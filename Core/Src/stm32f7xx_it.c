@@ -188,8 +188,8 @@ void SysTick_Handler(void)
   */
 void DMA1_Stream1_IRQHandler(void)
 {
-  void* d = (void *)1;
   /* USER CODE BEGIN DMA1_Stream1_IRQn 0 */
+  void* d = (void *)1;
   /* Check half-transfer complete interrupt */
   if (LL_DMA_IsEnabledIT_HT(DMA1, LL_DMA_STREAM_1) && LL_DMA_IsActiveFlag_HT1(DMA1)) {
     LL_DMA_ClearFlag_HT1(DMA1);             /* Clear half-transfer complete flag */
@@ -210,8 +210,8 @@ void DMA1_Stream1_IRQHandler(void)
   */
 void USART3_IRQHandler(void)
 {
-  void* d = (void *)1;
   /* USER CODE BEGIN USART3_IRQn 0 */
+  void* d = (void *)1;
   /* Check for IDLE line interrupt */
   if (LL_USART_IsEnabledIT_IDLE(USART3) && LL_USART_IsActiveFlag_IDLE(USART3)) {
     LL_USART_ClearFlag_IDLE(USART3);        /* Clear IDLE line flag */
