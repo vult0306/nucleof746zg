@@ -20,10 +20,12 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "lwip.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
+#include "stack_buf.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,6 +56,8 @@ const osThreadAttr_t defaultTask_attributes = {
 /* Message queue ID */
 osMessageQueueId_t usart_rx_dma_queue_id;
 uint8_t usart_rx_dma_buffer[64];
+struct Stack* input_stack;
+struct Stack* output_stack;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -168,15 +172,26 @@ void SystemClock_Config(void)
   /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 216;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Activate the Over-Drive mode
+  */
+  if (HAL_PWREx_EnableOverDrive() != HAL_OK)
   {
     Error_Handler();
   }
@@ -184,12 +199,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_7) != HAL_OK)
   {
     Error_Handler();
   }
@@ -250,7 +265,7 @@ static void MX_USART3_UART_Init(void)
 
   LL_DMA_SetStreamPriorityLevel(DMA1, LL_DMA_STREAM_1, LL_DMA_PRIORITY_LOW);
 
-  LL_DMA_SetMode(DMA1, LL_DMA_STREAM_1, LL_DMA_MODE_NORMAL);
+  LL_DMA_SetMode(DMA1, LL_DMA_STREAM_1, LL_DMA_MODE_CIRCULAR);
 
   LL_DMA_SetPeriphIncMode(DMA1, LL_DMA_STREAM_1, LL_DMA_PERIPH_NOINCREMENT);
 
@@ -322,6 +337,9 @@ static void MX_GPIO_Init(void)
 {
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
 }
@@ -335,17 +353,17 @@ void usart_rx_check(void) {
   pos = ARRAY_LEN(usart_rx_dma_buffer) - LL_DMA_GetDataLength(DMA1, LL_DMA_STREAM_1);
   if (pos != old_pos) {                       /* Check change in received data */
     if (pos > old_pos) {                    /* Current position is over previous one */
-      /* We are in "linear" mode */
-      /* Process data directly by subtracting "pointers" */
-      usart_process_data(&usart_rx_dma_buffer[old_pos], pos - old_pos);
+        /* We are in "linear" mode */
+        /* Process data directly by subtracting "pointers" */
+        usart_process_data(&usart_rx_dma_buffer[old_pos], pos - old_pos);
     } else {
-      /* We are in "overflow" mode */
-      /* First process data to the end of buffer */
-      usart_process_data(&usart_rx_dma_buffer[old_pos], ARRAY_LEN(usart_rx_dma_buffer) - old_pos);
-      /* Check and continue with beginning of buffer */
-      if (pos > 0) {
-        usart_process_data(&usart_rx_dma_buffer[0], pos);
-      }
+        /* We are in "overflow" mode */
+        /* First process data to the end of buffer */
+        usart_process_data(&usart_rx_dma_buffer[old_pos], ARRAY_LEN(usart_rx_dma_buffer) - old_pos);
+        /* Check and continue with beginning of buffer */
+        if (pos > 0) {
+            usart_process_data(&usart_rx_dma_buffer[0], pos);
+        }
     }
     old_pos = pos;                          /* Save current position as old */
   }
@@ -353,6 +371,7 @@ void usart_rx_check(void) {
 
 void usart_process_data(const void* data, size_t len) {
   const uint8_t* d = data;
+  char c;
 
   /*
     * This function is called on DMA TC and HT events, aswell as on UART IDLE (if enabled) line event.
@@ -362,14 +381,45 @@ void usart_process_data(const void* data, size_t len) {
     */
 
   for (; len > 0; --len, ++d) {
-    LL_USART_TransmitData8(USART3, *d);
-    while (!LL_USART_IsActiveFlag_TXE(USART3)) {}
+    if (*d == '\b'){
+      pop(input_stack);
+    }
+    else if (*d == '\r') {
+      usart_send_string("your message: ");
+      while(!isEmpty(input_stack)){
+        push(output_stack,pop(input_stack));
+      }
+
+      while(!isEmpty(output_stack)){
+        c = pop(output_stack);
+        LL_USART_TransmitData8(USART3, c);
+        while (!LL_USART_IsActiveFlag_TXE(USART3)) {};
+      }
+      usart_send_string("\r\n");
+      while (!LL_USART_IsActiveFlag_TC(USART3)) {}
+    }
+    else {
+      push(input_stack,(char)*d);
+    }
   }
-  while (!LL_USART_IsActiveFlag_TC(USART3)) {}
 }
 
 void usart_send_string(const char* str) {
-    usart_process_data(str, strlen(str));
+    const uint8_t* d = (uint8_t*)str;
+    size_t len = strlen(str);
+
+    /*
+     * This function is called on DMA TC and HT events, aswell as on UART IDLE (if enabled) line event.
+     *
+     * For the sake of this example, function does a loop-back data over UART in polling mode.
+     * Check ringbuff RX-based example for implementation with TX & RX DMA transfer.
+     */
+
+    for (; len > 0; --len, ++d) {
+        LL_USART_TransmitData8(USART3, *d);
+        while (!LL_USART_IsActiveFlag_TXE(USART3)) {}
+    }
+    while (!LL_USART_IsActiveFlag_TC(USART3)) {}
 }
 
 /* USER CODE END 4 */
@@ -383,8 +433,12 @@ void usart_send_string(const char* str) {
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
+  /* init code for LWIP */
+  MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
   void* d;
+  input_stack = createStack(100);
+  output_stack = createStack(100);
 
   /* Notify user to start sending data */
   usart_send_string("USART DMA example: DMA HT & TC + USART IDLE LINE IRQ + RTOS processing\r\n");
