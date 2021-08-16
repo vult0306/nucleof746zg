@@ -406,15 +406,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
-name = "stm32-fmc"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2495e5473ea41d3f34e199ee1f3d1dd7895b1d9b0d9dcaef5be896248eb5514"
-dependencies = [
- "embedded-hal",
-]
-
-[[package]]
 name = "stm32f7"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -445,7 +436,6 @@ dependencies = [
  "panic-semihosting",
  "rand_core",
  "rtcc",
- "stm32-fmc",
  "stm32f7",
  "void",
 ]

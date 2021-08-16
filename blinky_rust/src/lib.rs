@@ -23,9 +23,6 @@ pub use crate::pac::interrupt;
 #[cfg(feature = "device-selected")]
 pub mod delay;
 
-#[cfg(all(feature = "device-selected", feature = "fmc"))]
-pub mod fmc;
-
 #[cfg(feature = "device-selected")]
 pub mod gpio;
 
@@ -34,9 +31,6 @@ pub mod prelude;
 
 #[cfg(feature = "device-selected")]
 pub mod rcc;
-
-#[cfg(feature = "device-selected")]
-pub mod rng;
 
 pub mod state {
     /// Indicates that a peripheral is enabled
