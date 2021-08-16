@@ -200,6 +200,11 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /* USER CODE BEGIN 1 */
-
+void SPI1_IRQHandler(void)
+{
+  if (READ_BIT(hspi1.Instance->SR, SPI_SR_RXNE) != 0) {
+    rx_callback();
+  }
+}
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
