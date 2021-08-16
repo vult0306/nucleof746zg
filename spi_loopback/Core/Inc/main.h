@@ -47,8 +47,8 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-extern SPI_HandleTypeDef hspi1;
 extern void rx_callback();
+extern void System_init();
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
