@@ -1,12 +1,12 @@
 Nucleo-F746ZG Project
 
-About
 Hardware: Nucleo-F746ZG board
 IC: STM32F746ZG
 IDE: STM32CUBEIDE (and Rust)
 
 
 Application description:
+
 1: dma_uart
     Make the nucleo-f746zg as a chatting device. Take user's message from keyboard,
     send this message over the internet. FreeRTOS, UART-DMA supported.
@@ -28,9 +28,9 @@ Getting started
     $ cd blinky_rust
     
     - Compile the application:
-    $ Cargo build --example blinky --features="stm32f746 rt"
+    $ cargo build --example blinky --features="stm32f746 rt"
 
     - Attact the micro-USB cable to your board
     - Flash the application:
-    $ Cargo flash --chip stm32f746zg --example blinky --feature="stm32f746 rt"
+    $ cargo flash --chip stm32f746zg --example blinky --feature="stm32f746 rt"
 
